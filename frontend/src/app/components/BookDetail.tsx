@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router';
 import { ArrowLeft, Edit2, Trash2 } from 'lucide-react';
-import { BOOK_STATUS_LABELS, type BookStatus } from '../data/books';
+import { BOOK_STATUS_LABELS, CLC_CATEGORIES, type BookStatus } from '../data/books';
 import { BookForm, BookFormData } from './BookForm';
 import { useBooks } from '../hooks/useBooks';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 export function BookDetail() {
   const { id } = useParams<{ id: string }>();
@@ -13,6 +14,9 @@ export function BookDetail() {
   const { books, loading, error } = useBooks();
   const [saving, setSaving] = useState(false);
   const [localBook, setLocalBook] = useState<(typeof books)[number] | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
 
   const bookFromStore = useMemo(() => {
     const bookId = Number(id);
@@ -111,6 +115,7 @@ export function BookDetail() {
         status: normalizeOptional(data.status),
         tags: normalizeOptional(tags),
         summary: normalizeOptional(summary),
+        publisher: normalizeOptional(data.publisher),
       };
 
       const res = await fetch(`/api/v1/books/${book.id}`, {
@@ -136,12 +141,23 @@ export function BookDetail() {
     }
   };
 
-  const handleDelete = () => {
-    if (confirm(`确定要删除《${book.title}》吗？此操作无法撤销。`)) {
-      // In a real app, this would delete from database
-      console.log('Deleting book:', book.id);
+  const handleDeleteConfirm = async () => {
+    if (deleting) return;
+    try {
+      setDeleting(true);
+      const res = await fetch(`/api/v1/books/${book.id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`);
+      }
       alert('书籍已删除！');
+      setShowDeleteModal(false);
       navigate('/library');
+    } catch (e) {
+      alert(`删除失败：${(e as Error).message}`);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -173,7 +189,7 @@ export function BookDetail() {
                 编辑
               </button>
               <button
-                onClick={handleDelete}
+                onClick={() => setShowDeleteModal(true)}
                 className="inline-flex items-center gap-2 px-4 py-2 text-muted-foreground hover:text-destructive border border-border rounded-lg hover:border-destructive/50 transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
@@ -205,19 +221,31 @@ export function BookDetail() {
         ) : (
           /* View Mode */
           <div>
-            {/* Title and Author */}
+            {/* Title and Author/Publisher */}
             <div className="mb-8">
               <h1 className="text-4xl mb-3">{book.title}</h1>
-              {book.author && (
-                <p className="text-xl text-muted-foreground">{book.author}</p>
-              )}
+              {(() => {
+                const parts = [book.author, book.publisher].filter(Boolean);
+                if (parts.length === 0) return null;
+                return (
+                  <p className="text-xl text-muted-foreground">
+                    {parts.join(' / ')}
+                  </p>
+                );
+              })()}
             </div>
 
             {/* Badges */}
             <div className="flex flex-wrap items-center gap-3 mb-8 pb-8 border-b border-border">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted rounded-lg">
                 <span className="text-primary">{book.clc_code}</span>
-                {/* <span className="text-sm text-muted-foreground">{book.category.name}</span> */}
+                {
+                  CLC_CATEGORIES.find(c => c.code === book.clc_code)?.name && (
+                    <span className="text-sm text-muted-foreground">
+                      {CLC_CATEGORIES.find(c => c.code === book.clc_code)?.name}
+                    </span>
+                  )
+                }
               </div>
               {
                 book.status && (book.status in BOOK_STATUS_LABELS) && (
@@ -272,6 +300,14 @@ export function BookDetail() {
           </div>
         )}
       </main>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={showDeleteModal}
+        bookTitle={book.title}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setShowDeleteModal(false)}
+      />
     </div>
   );
 }

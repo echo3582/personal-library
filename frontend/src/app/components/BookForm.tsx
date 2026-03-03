@@ -20,6 +20,7 @@ export interface BookFormData {
   status: BookStatus;
   tags: string[];
   summary: string;
+  publisher: string;
 }
 
 export function BookForm({
@@ -37,6 +38,7 @@ export function BookForm({
     status: initialData?.status || 'unread',
     tags: initialData?.tags || [],
     summary: initialData?.summary || '',
+    publisher: initialData?.publisher || '',
   });
   const [tagInput, setTagInput] = useState('');
 
@@ -126,6 +128,21 @@ export function BookForm({
           onChange={(e) => setFormData(prev => ({ ...prev, author: e.target.value }))}
           className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
           placeholder="输入作者名"
+        />
+      </div>
+
+      {/* Publisher */}
+      <div>
+        <label htmlFor="publisher" className="block mb-2">
+          出版社
+        </label>
+        <input
+          id="publisher"
+          type="text"
+          value={formData.publisher}
+          onChange={(e) => setFormData(prev => ({ ...prev, publisher: e.target.value }))}
+          className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+          placeholder="输入出版社"
         />
       </div>
 

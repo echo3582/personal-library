@@ -2,8 +2,9 @@ import React from 'react';
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router';
 import { CLC_CATEGORIES, BOOK_STATUS_LABELS, BookStatus } from '../data/books';
-import { X, Edit2 } from 'lucide-react';
+import { X, Edit2, Trash2, MoreVertical } from 'lucide-react';
 import { useBooks } from '../hooks/useBooks';
+import { DeleteConfirmModal } from './DeleteConfirmModal.tsx';
 
 export function Library() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -11,10 +12,18 @@ export function Library() {
   const searchParam = searchParams.get('search');
 
   const { books, loading, error } = useBooks();
+  const [localBooks, setLocalBooks] = useState(books);
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(categoryParam);
   const [selectedStatuses, setSelectedStatuses] = useState<BookStatus[]>([]);
   const [searchQuery, setSearchQuery] = useState(searchParam || '');
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [deleteModalBook, setDeleteModalBook] = useState<{ id: number; title: string } | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    setLocalBooks(books);
+  }, [books]);
 
   useEffect(() => {
     setSelectedCategory(categoryParam);
@@ -29,7 +38,7 @@ export function Library() {
     book.tags ? book.tags.split(',').map((t) => t.trim()).filter(Boolean) : [];
 
   // Filter books（数据源改为接口返回的 books）
-  let filteredBooks = [...books];
+  let filteredBooks = [...localBooks];
 
   if (selectedCategory) {
     filteredBooks = filteredBooks.filter((book) => book.clc_code === selectedCategory);
@@ -64,8 +73,42 @@ export function Library() {
     setSearchParams({ category: code });
   };
 
+  const handleDeleteClick = (e: React.MouseEvent, bookId: number, bookTitle: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDeleteModalBook({ id: bookId, title: bookTitle });
+    setOpenMenuId(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteModalBook) return;
+    if (deletingId != null) return;
+    try {
+      setDeletingId(deleteModalBook.id);
+      const res = await fetch(`/api/v1/books/${deleteModalBook.id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`);
+      }
+      setLocalBooks((prev) => prev.filter((b) => b.id !== deleteModalBook.id));
+      alert('书籍已删除！');
+      setDeleteModalBook(null);
+    } catch (e) {
+      alert(`删除失败：${(e as Error).message}`);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const toggleMenu = (e: React.MouseEvent, bookId: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setOpenMenuId(openMenuId === bookId ? null : bookId);
+  };
+
   const allTags = Array.from(
-    new Set(books.flatMap((book) => tagsArray(book)))
+    new Set(localBooks.flatMap((book) => tagsArray(book)))
   );
 
   return (
@@ -101,7 +144,7 @@ export function Library() {
             
             <div className="space-y-1 max-h-[calc(100vh-240px)] overflow-y-auto">
               {CLC_CATEGORIES.map(category => {
-                const count = books.filter(book => book.clc_code === category.code).length;
+                const count = localBooks.filter(book => book.clc_code === category.code).length;
                 if (count === 0) return null;
                 
                 return (
@@ -240,11 +283,19 @@ export function Library() {
                         }
                       </div>
                       
-                      <p className="text-muted-foreground mb-3">{book.author}</p>
+                      {(() => {
+                        const parts = [book.author, book.publisher].filter(Boolean);
+                        if (parts.length === 0) return null;
+                        return (
+                          <p className="text-muted-foreground mb-3">
+                            {parts.join(' / ')}
+                          </p>
+                        );
+                      })()}
                       
                       {book.tags && book.tags.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-2">
-                          {book.tags.map(tag => (
+                          {tagsArray(book).map(tag => (
                             <span
                               key={tag}
                               className="inline-block px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded"
@@ -255,14 +306,18 @@ export function Library() {
                         </div>
                       )}
                       
-                      {book.note && (
-                        <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{book.note}</p>
+                      {book.summary && (
+                        <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{book.summary}</p>
                       )}
                     </Link>
                     
-                    <div className="flex flex-col items-end gap-3">
+                    {/* <div className="flex flex-col items-end gap-3">
                       <div className="text-sm text-muted-foreground">
-                        {new Date(book.created_at).toLocaleDateString('zh-CN')}
+                        {(() => {
+                          const createdAt = (book as any).created_at as string | undefined;
+                          if (!createdAt) return null;
+                          return new Date(createdAt).toLocaleDateString('zh-CN');
+                        })()}
                       </div>
                       <Link
                         to={`/book/${book.id}`}
@@ -275,6 +330,43 @@ export function Library() {
                         <Edit2 className="w-3 h-3" />
                         编辑
                       </Link>
+                    </div> */}
+                    <div className="flex flex-col items-end gap-3">
+                      <div className="text-sm text-muted-foreground">
+                        {(() => {
+                          const createdAt = (book as any).created_at as string | undefined;
+                          if (!createdAt) return null;
+                          return new Date(createdAt).toLocaleDateString('zh-CN');
+                        })()}
+                      </div>
+                      
+                      {/* Overflow Menu */}
+                      <div className="relative">
+                        <button
+                          onClick={(e) => toggleMenu(e, book.id)}
+                          className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+                        
+                        {openMenuId === book.id && (
+                          <>
+                            <div 
+                              className="fixed inset-0 z-10" 
+                              onClick={() => setOpenMenuId(null)}
+                            />
+                            <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg py-1 z-20 min-w-[120px]">
+                              <button
+                                onClick={(e) => handleDeleteClick(e, book.id, book.title)}
+                                className="w-full text-left px-4 py-2 text-sm text-muted-foreground hover:text-destructive hover:bg-muted transition-colors flex items-center gap-2"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                删除
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -283,6 +375,15 @@ export function Library() {
           </div>
         </div>
       </main>
+      {/* Delete Confirmation Modal */}
+      {deleteModalBook && (
+        <DeleteConfirmModal
+          isOpen={!!deleteModalBook}
+          bookTitle={deleteModalBook.title}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setDeleteModalBook(null)}
+        />
+      )}
     </div>
   );
 }
