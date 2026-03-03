@@ -3,6 +3,7 @@ import { Dashboard } from './components/Dashboard';
 import { Library } from './components/Library';
 import { AddBook } from './components/AddBook';
 import { NotFound } from './components/NotFound';
+import { BookDetail } from './components/BookDetail';
 
 export const router = createBrowserRouter([
   {
@@ -16,6 +17,10 @@ export const router = createBrowserRouter([
   {
     path: '/add-book',
     Component: AddBook,
+  },
+  {
+    path: '/book/:id',
+    Component: BookDetail,
   },
   {
     path: '*',

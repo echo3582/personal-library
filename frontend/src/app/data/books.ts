@@ -7,7 +7,7 @@ export interface Book {
   status: BookStatus;
   tags: string[];
   note?: string;
-  addedDate: string;
+  created_at: string;
 }
 
 export type BookStatus = 'unread' | 'reading' | 'read' | 'paused' | 'want-to-read';
@@ -62,7 +62,7 @@ export const mockBooks: Book[] = [
     status: 'read',
     tags: ['日本文学', '小说'],
     note: '深刻的自我剖析',
-    addedDate: '2026-01-15',
+    created_at: '2026-01-15',
   },
   {
     id: '2',
@@ -71,7 +71,7 @@ export const mockBooks: Book[] = [
     category: CLC_CATEGORIES.find(c => c.code === 'B')!,
     status: 'reading',
     tags: ['哲学', '历史'],
-    addedDate: '2026-01-20',
+    created_at: '2026-01-20',
   },
   {
     id: '3',
@@ -80,7 +80,7 @@ export const mockBooks: Book[] = [
     category: CLC_CATEGORIES.find(c => c.code === 'K')!,
     status: 'want-to-read',
     tags: ['历史', '明朝'],
-    addedDate: '2026-02-01',
+    created_at: '2026-02-01',
   },
   {
     id: '4',
@@ -89,7 +89,7 @@ export const mockBooks: Book[] = [
     category: CLC_CATEGORIES.find(c => c.code === 'TP')!,
     status: 'reading',
     tags: ['计算机', '系统'],
-    addedDate: '2026-02-10',
+    created_at: '2026-02-10',
   },
   {
     id: '5',
@@ -98,7 +98,7 @@ export const mockBooks: Book[] = [
     category: CLC_CATEGORIES.find(c => c.code === 'I')!,
     status: 'unread',
     tags: ['拉美文学', '魔幻现实主义'],
-    addedDate: '2026-02-15',
+    created_at: '2026-02-15',
   },
   {
     id: '6',
@@ -107,6 +107,6 @@ export const mockBooks: Book[] = [
     category: CLC_CATEGORIES.find(c => c.code === 'F')!,
     status: 'paused',
     tags: ['经济学', '教材'],
-    addedDate: '2026-02-20',
+    created_at: '2026-02-20',
   },
 ];

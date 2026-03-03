@@ -1,13 +1,17 @@
+import React from 'react';
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router';
-import { CLC_CATEGORIES, mockBooks, BOOK_STATUS_LABELS, BookStatus } from '../data/books';
-import { X } from 'lucide-react';
+import { CLC_CATEGORIES, BOOK_STATUS_LABELS, BookStatus } from '../data/books';
+import { X, Edit2 } from 'lucide-react';
+import { useBooks } from '../hooks/useBooks';
 
 export function Library() {
   const [searchParams, setSearchParams] = useSearchParams();
   const categoryParam = searchParams.get('category');
   const searchParam = searchParams.get('search');
-  
+
+  const { books, loading, error } = useBooks();
+
   const [selectedCategory, setSelectedCategory] = useState<string | null>(categoryParam);
   const [selectedStatuses, setSelectedStatuses] = useState<BookStatus[]>([]);
   const [searchQuery, setSearchQuery] = useState(searchParam || '');
@@ -20,31 +24,38 @@ export function Library() {
     setSearchQuery(searchParam || '');
   }, [searchParam]);
 
-  // Filter books
-  let filteredBooks = [...mockBooks];
+  // 把后端返回的 tags 字符串转成数组，便于筛选和展示
+  const tagsArray = (book: { tags?: string | null }) =>
+    book.tags ? book.tags.split(',').map((t) => t.trim()).filter(Boolean) : [];
+
+  // Filter books（数据源改为接口返回的 books）
+  let filteredBooks = [...books];
 
   if (selectedCategory) {
-    filteredBooks = filteredBooks.filter(book => book.category.code === selectedCategory);
+    filteredBooks = filteredBooks.filter((book) => book.clc_code === selectedCategory);
   }
 
   if (selectedStatuses.length > 0) {
-    filteredBooks = filteredBooks.filter(book => selectedStatuses.includes(book.status));
+    filteredBooks = filteredBooks.filter(
+      (book) => book.status != null && selectedStatuses.includes(book.status as BookStatus)
+    );
   }
 
   if (searchQuery) {
     const query = searchQuery.toLowerCase();
-    filteredBooks = filteredBooks.filter(book => 
-      book.title.toLowerCase().includes(query) ||
-      book.author.toLowerCase().includes(query) ||
-      book.tags.some(tag => tag.toLowerCase().includes(query))
-    );
+    filteredBooks = filteredBooks.filter((book) => {
+      const tags = tagsArray(book);
+      return (
+        book.title.toLowerCase().includes(query) ||
+        (book.author?.toLowerCase().includes(query) ?? false) ||
+        tags.some((tag) => tag.toLowerCase().includes(query))
+      );
+    });
   }
 
   const toggleStatus = (status: BookStatus) => {
-    setSelectedStatuses(prev => 
-      prev.includes(status) 
-        ? prev.filter(s => s !== status)
-        : [...prev, status]
+    setSelectedStatuses((prev) =>
+      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
     );
   };
 
@@ -53,7 +64,9 @@ export function Library() {
     setSearchParams({ category: code });
   };
 
-  const allTags = Array.from(new Set(mockBooks.flatMap(book => book.tags)));
+  const allTags = Array.from(
+    new Set(books.flatMap((book) => tagsArray(book)))
+  );
 
   return (
     <div className="min-h-screen flex">
@@ -88,7 +101,7 @@ export function Library() {
             
             <div className="space-y-1 max-h-[calc(100vh-240px)] overflow-y-auto">
               {CLC_CATEGORIES.map(category => {
-                const count = mockBooks.filter(book => book.category.code === category.code).length;
+                const count = books.filter(book => book.clc_code === category.code).length;
                 if (count === 0) return null;
                 
                 return (
@@ -122,14 +135,18 @@ export function Library() {
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl mb-2">
-              {selectedCategory 
-                ? CLC_CATEGORIES.find(c => c.code === selectedCategory)?.name 
+              {selectedCategory
+                ? CLC_CATEGORIES.find(c => c.code === selectedCategory)?.name
                 : '所有书籍'}
             </h1>
             <p className="text-muted-foreground">
-              共 {filteredBooks.length} 本书
+              {loading ? '加载中...' : `共 ${filteredBooks.length} 本书`}
             </p>
           </div>
+
+          {error && (
+            <p className="text-red-500 mb-4">加载书籍失败：{error.message}</p>
+          )}
 
           {/* Filter Bar */}
           <div className="mb-8 space-y-4">
@@ -137,7 +154,7 @@ export function Library() {
             <div>
               <div className="text-sm text-muted-foreground mb-2">状态筛选</div>
               <div className="flex flex-wrap gap-2">
-                {Object.entries(BOOK_STATUS_LABELS).map(([status, { zh, color }]) => (
+                {Object.entries(BOOK_STATUS_LABELS).map(([status, { zh }]) => (
                   <button
                     key={status}
                     onClick={() => toggleStatus(status as BookStatus)}
@@ -192,7 +209,9 @@ export function Library() {
 
           {/* Book List */}
           <div className="space-y-4">
-            {filteredBooks.length === 0 ? (
+            {loading ? (
+              <div className="text-center py-16 text-muted-foreground">加载中...</div>
+            ) : filteredBooks.length === 0 ? (
               <div className="text-center py-16 text-muted-foreground">
                 <p>暂无符合条件的书籍</p>
                 <Link to="/add-book" className="text-primary hover:underline mt-2 inline-block">
@@ -203,23 +222,27 @@ export function Library() {
               filteredBooks.map(book => (
                 <div
                   key={book.id}
-                  className="bg-card border border-border rounded-lg p-6 hover:shadow-md hover:border-primary/30 transition-all"
+                  className="bg-card border border-border rounded-lg p-6 hover:shadow-md hover:border-primary/30 transition-all group"
                 >
                   <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
+                    <Link to={`/book/${book.id}`} className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-xl">{book.title}</h3>
+                        <h3 className="text-xl group-hover:text-primary transition-colors">{book.title}</h3>
                         <span className="inline-block px-2 py-1 text-xs bg-muted text-muted-foreground rounded">
-                          {book.category.code}
+                          {book.clc_code}
                         </span>
-                        <span className={`inline-block px-2 py-1 text-xs rounded ${BOOK_STATUS_LABELS[book.status].color}`}>
-                          {BOOK_STATUS_LABELS[book.status].zh}
-                        </span>
+                        {
+                          book.status && (
+                            <span className={`inline-block px-2 py-1 text-xs rounded ${BOOK_STATUS_LABELS[book.status].color}`}>
+                              {BOOK_STATUS_LABELS[book.status].zh}
+                            </span>
+                          )
+                        }
                       </div>
                       
                       <p className="text-muted-foreground mb-3">{book.author}</p>
                       
-                      {book.tags.length > 0 && (
+                      {book.tags && book.tags.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-2">
                           {book.tags.map(tag => (
                             <span
@@ -233,12 +256,25 @@ export function Library() {
                       )}
                       
                       {book.note && (
-                        <p className="text-sm text-muted-foreground mt-2">{book.note}</p>
+                        <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{book.note}</p>
                       )}
-                    </div>
+                    </Link>
                     
-                    <div className="text-right text-sm text-muted-foreground">
-                      {new Date(book.addedDate).toLocaleDateString('zh-CN')}
+                    <div className="flex flex-col items-end gap-3">
+                      <div className="text-sm text-muted-foreground">
+                        {new Date(book.created_at).toLocaleDateString('zh-CN')}
+                      </div>
+                      <Link
+                        to={`/book/${book.id}`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          window.location.href = `/book/${book.id}?edit=true`;
+                        }}
+                        className="inline-flex items-center gap-1 px-3 py-1 text-sm text-muted-foreground hover:text-primary hover:bg-muted rounded transition-colors"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                        编辑
+                      </Link>
                     </div>
                   </div>
                 </div>

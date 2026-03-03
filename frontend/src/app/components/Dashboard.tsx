@@ -1,21 +1,24 @@
+import React from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Search, Plus } from 'lucide-react';
-import { CLC_CATEGORIES, mockBooks } from '../data/books';
+import { CLC_CATEGORIES } from '../data/books';
 import { useState } from 'react';
+import { useBooks } from '../hooks/useBooks';
 
 export function Dashboard() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const { books, loading, error } = useBooks();
 
-  // Count books per category
-  const categoryCount = CLC_CATEGORIES.map(category => ({
+  // Count books per category（基于后端 clc_code）
+  const categoryCount = CLC_CATEGORIES.map((category) => ({
     ...category,
-    count: mockBooks.filter(book => book.category.code === category.code).length,
+    count: books.filter((book) => book.clc_code === category.code).length,
   }));
 
   // Get recently added books (last 5)
-  const recentBooks = [...mockBooks]
-    .sort((a, b) => new Date(b.addedDate).getTime() - new Date(a.addedDate).getTime())
+  const recentBooks = [...books]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 5);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -64,8 +67,20 @@ export function Dashboard() {
       <main className="max-w-[1440px] mx-auto px-8 py-12">
         <div className="mb-12">
           <h1 className="text-4xl mb-2">我的图书馆</h1>
-          <p className="text-muted-foreground">按中国图书馆分类法管理您的藏书</p>
+          <p className="text-muted-foreground">
+            按中国图书馆分类法管理您的藏书
+          </p>
         </div>
+
+        {loading && (
+          <p className="text-muted-foreground mb-8">正在加载书籍数据...</p>
+        )}
+
+        {error && (
+          <p className="text-red-500 mb-8">
+            加载书籍数据失败：{error.message}
+          </p>
+        )}
 
         {/* CLC Category Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-16">
@@ -80,7 +95,9 @@ export function Dashboard() {
                   {category.code}
                 </div>
                 <h3 className="mb-1 text-lg">{category.name}</h3>
-                <p className="text-sm text-muted-foreground mb-3">{category.nameEn}</p>
+                <p className="text-sm text-muted-foreground mb-3">
+                  {category.nameEn}
+                </p>
                 <div className="text-sm text-muted-foreground">
                   {category.count} {category.count === 1 ? '本' : '本书'}
                 </div>
@@ -97,16 +114,26 @@ export function Dashboard() {
               {recentBooks.map((book) => (
                 <Link
                   key={book.id}
-                  to={`/library?category=${book.category.code}`}
+                  to={
+                    book.clc_code
+                      ? `/library?category=${book.clc_code}`
+                      : '/library'
+                  }
                   className="bg-card border border-border rounded-lg p-4 hover:shadow-md hover:border-primary/30 transition-all"
                 >
                   <div className="mb-2">
-                    <span className="inline-block px-2 py-1 text-xs bg-muted text-muted-foreground rounded">
-                      {book.category.code}
-                    </span>
+                    {book.clc_code && (
+                      <span className="inline-block px-2 py-1 text-xs bg-muted text-muted-foreground rounded">
+                        {book.clc_code}
+                      </span>
+                    )}
                   </div>
                   <h4 className="mb-1 line-clamp-2">{book.title}</h4>
-                  <p className="text-sm text-muted-foreground">{book.author}</p>
+                  {book.author && (
+                    <p className="text-sm text-muted-foreground">
+                      {book.author}
+                    </p>
+                  )}
                 </Link>
               ))}
             </div>
